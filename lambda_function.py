@@ -1,3 +1,7 @@
+"""Lambda to create a new PNG file for a given TIFF file inside the same S3 Bucket
+It does not delete or modify the original TIFF file
+"""
+
 from io import BytesIO
 from os import path
 
@@ -23,16 +27,15 @@ def lambda_handler(event, context):
 
     upload_path = "/tmp/{}.png".format(s3Key)
 
-    extension = path.splitext(s3Key)[1].lower()
-    if extension in [".tif"]:
+    rootname, extension = path.splitext(s3Key)
+    extension = extension.lower()
+    if extension in [".tif", ".tiff"]:
         obj = s3Client.Object(bucket_name=s3Bucket, key=s3Key)
         obj_body = obj.get()["Body"].read()
         img = Image.open(BytesIO(obj_body))
         img.save(upload_path, format="PNG")
 
-        s3Client.upload_file(
-            upload_path, "{}png".format(s3Bucket), "{}.png".format(s3Key)
-        )
+        s3Client.upload_file(upload_path, s3Bucket, "{}.png".format(rootname))
 
         results = [
             {"taskId": taskId, "resultCode": "Succeeded", "resultString": "Succeeded"}
