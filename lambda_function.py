@@ -40,6 +40,7 @@ def lambda_handler(event, context):
         img.save(upload_path, format="PNG")
 
         s3Client.upload_file(upload_path, s3Bucket, "{}.png".format(rootname))
+        s3Client.delete_object(Bucket=s3Bucket, Key=s3Key)
 
         results = [
             {"taskId": taskId, "resultCode": "Succeeded", "resultString": "Succeeded"}
