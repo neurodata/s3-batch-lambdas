@@ -3,7 +3,7 @@ It does not delete or modify the original TIFF file
 """
 
 from io import BytesIO
-from os import path, makedirs
+from os import path, makedirs, remove
 
 import boto3
 from PIL import Image
@@ -34,19 +34,27 @@ def lambda_handler(event, context):
 
     extension = extension.lower()
     if extension in [".tif", ".tiff"]:
-        response = s3Client.get_object(Bucket=s3Bucket, Key=s3Key)
-        obj_body = response["Body"].read()
-        img = Image.open(BytesIO(obj_body))
-        img.save(upload_path, format="PNG")
+        try:
+            response = s3Client.get_object(Bucket=s3Bucket, Key=s3Key)
+            obj_body = response["Body"].read()
+            img = Image.open(BytesIO(obj_body))
+            img.save(upload_path, format="PNG")
 
-        s3Client.upload_file(upload_path, s3Bucket, "{}.png".format(rootname))
-        s3Client.delete_object(Bucket=s3Bucket, Key=s3Key)
+            s3Client.upload_file(upload_path, s3Bucket, "{}.png".format(rootname))
+            s3Client.delete_object(Bucket=s3Bucket, Key=s3Key)
 
-        results = [
-            {"taskId": taskId, "resultCode": "Succeeded", "resultString": "Succeeded"}
-        ]
-    else:
-        results = [{"taskId": taskId, "resultCode": "PermanentFailure"}]
+            # needed to clear disk space from lambda container
+            remove(upload_path)
+
+            results = [
+                {
+                    "taskId": taskId,
+                    "resultCode": "Succeeded",
+                    "resultString": "Succeeded",
+                }
+            ]
+        except Exception:
+            results = [{"taskId": taskId, "resultCode": "TemporaryFailure"}]
 
     return {
         "invocationSchemaVersion": invocationSchemaVersion,
